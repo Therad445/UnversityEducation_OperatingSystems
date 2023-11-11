@@ -1,32 +1,25 @@
-#include <signal.h>
-#include <stdbool.h>
+#include <ctype.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 #include <getopt.h>
 
 #include "find_min_max.h"
 #include "utils.h"
 
-int active_child_processes = 0;
-
-void alarm_handler(int sig) {
-  printf("Timeout exceeded. Killing child processes...\n");
-  fflush(NULL);
-  kill(0, SIGKILL);
-}
-
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
   bool with_files = false;
-  int timeout = -1;
 
   while (true) {
     int current_optind = optind ? optind : 1;
@@ -35,7 +28,6 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
-                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
@@ -70,13 +62,7 @@ int main(int argc, char **argv) {
           case 3:
             with_files = true;
             break;
-          case 4:
-            timeout = atoi(optarg);
-            if (timeout <= 0) {
-              printf("Timeout must be a positive integer\n");
-              return 1;
-            }
-            break;
+
           default:
             printf("Index %d is out of options\n", option_index);
         }
@@ -99,13 +85,14 @@ int main(int argc, char **argv) {
   }
 
   if (seed == -1 || array_size == -1 || pnum == -1) {
-    printf("Usage: %s --seed \"num\" --array_size \"num\" --pnum \"num\" [--timeout \"num\"]\n",
+    printf("Usage: %s --seed \"num\" --array_size \"num\" --pnum \"num\" \n",
            argv[0]);
     return 1;
   }
 
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
+  int active_child_processes = 0;
 
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
@@ -116,11 +103,6 @@ int main(int argc, char **argv) {
       perror("pipe");
       exit(EXIT_FAILURE);
     }
-  }
-
-  signal(SIGALRM, alarm_handler);
-  if (timeout > 0) {
-    alarm(timeout);
   }
 
   for (int i = 0; i < pnum; i++) {

@@ -2,65 +2,48 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-pthread_mutex_t mutex;
-int result = 1;
+#define MAX_THREADS 100
+
+int k, pnum, mod;
+int result[MAX_THREADS];
 
 void *factorial(void *arg) {
-    int k = *((int *) arg);
-    int mod = *((int *) arg + 1);
-    int local_result = 1;
-
-    for (int i = 1; i <= k; i++) {
-        local_result = (local_result * i) % mod;
+    int id = *(int*)arg;
+    int start = id * (k/pnum) + 1;
+    int end = (id == pnum-1) ? k : (id+1) * (k/pnum);
+    int res = 1;
+    for (int i = start; i <= end; i++) {
+        res = (res * i) % mod;
     }
-
-    pthread_mutex_lock(&mutex);
-    result = (result * local_result) % mod;
-    pthread_mutex_unlock(&mutex);
-
+    result[id] = res;
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
-    int k = 0;
-    int pnum = 0;
-    int mod = 0;
-
-    // Parse command line arguments
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-k") == 0) {
-            k = atoi(argv[i+1]);
-        } else if (strcmp(argv[i], "--pnum") == 0) {
-            pnum = atoi(argv[i+1]);
-        } else if (strcmp(argv[i], "--mod") == 0) {
-            mod = atoi(argv[i+1]);
-        }
+    if (argc != 7) {
+        printf("Usage: %s -k <number> --pnum=<number of threads> --mod=<modulus>\n", argv[0]);
+        return 1;
     }
-
-    // Initialize mutex
-    pthread_mutex_init(&mutex, NULL);
-
-    // Create threads
-    pthread_t threads[pnum];
-    int args[pnum * 2];
-    int step = k / pnum;
-
+    k = atoi(argv[2]);
+    pnum = atoi(argv[4]);
+    mod = atoi(argv[6]);
+    if (pnum > MAX_THREADS) {
+        printf("Error: maximum number of threads is %d\n", MAX_THREADS);
+        return 1;
+    }
+    pthread_t threads[MAX_THREADS];
+    int ids[MAX_THREADS];
     for (int i = 0; i < pnum; i++) {
-        args[i * 2] = (i == pnum - 1) ? k - i * step : step;
-        args[i * 2 + 1] = mod;
-        pthread_create(&threads[i], NULL, factorial, &args[i * 2]);
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, factorial, &ids[i]);
     }
-
-    // Wait for threads to finish
     for (int i = 0; i < pnum; i++) {
         pthread_join(threads[i], NULL);
     }
-
-    // Print result
-    printf("%d! mod %d = %d\n", k, mod, result);
-
-    // Destroy mutex
-    pthread_mutex_destroy(&mutex);
-
+    int res = 1;
+    for (int i = 0; i < pnum; i++) {
+        res = (res * result[i]) % mod;
+    }
+    printf("%d! mod %d = %d\n", k, mod, res);
     return 0;
 }

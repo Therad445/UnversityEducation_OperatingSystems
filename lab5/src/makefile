@@ -8,7 +8,7 @@ CFLAGS=-I.
 	$(CC) -o mutex_off mutex_off.c $(CFLAGS)
 
  program2: 
-	$(CC) -o program2 program2.c -lpthread $(CFLAGS)
+	$(CC) -o program2 program2.c $(CFLAGS)
 
  program3: 
 	$(CC) -o program3 program3.c -lpthread $(CFLAGS)
