@@ -14,10 +14,28 @@
 
 #include "utils.h"
 
+#define MAX_SERVERS 10
+
 struct Server {
-  char ip[255];
-  int port;
+    char ip[255];
+    int port;
 };
+
+int read_servers(const char *filename, struct Server *servers, int max_servers) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Can't open file %s\n", filename);
+        return -1;
+    }
+
+    int i = 0;
+    while (i < max_servers && fscanf(file, "%s %d", servers[i].ip, &servers[i].port) == 2) {
+        i++;
+    }
+
+    fclose(file);
+    return i;
+}
 
 int main(int argc, char **argv) {
   uint64_t k = -1;
@@ -72,19 +90,22 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // TODO: for one server here, rewrite with servers from file
-  unsigned int servers_num = 1;
-  struct Server *to = malloc(sizeof(struct Server) * servers_num);
-  // TODO: delete this and parallel work between servers
-  to[0].port = 20001;
-  memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
+  unsigned int servers_num = read_servers(servers, to, MAX_SERVERS);
+if (servers_num <= 0) {
+    fprintf(stderr, "No servers found in file %s\n", servers);
+    return 1;
+}
 
-  // TODO: work continiously, rewrite to make parallel
-  for (int i = 0; i < servers_num; i++) {
+uint64_t begin = 1;
+uint64_t end = k;
+uint64_t range = (end - begin + 1) / servers_num;
+uint64_t remainder = (end - begin + 1) % servers_num;
+
+for (int i = 0; i < servers_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
     if (hostname == NULL) {
-      fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
-      exit(1);
+        fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
+        exit(1);
     }
 
     struct sockaddr_in server;
@@ -94,44 +115,43 @@ int main(int argc, char **argv) {
 
     int sck = socket(AF_INET, SOCK_STREAM, 0);
     if (sck < 0) {
-      fprintf(stderr, "Socket creation failed!\n");
-      exit(1);
+        fprintf(stderr, "Socket creation failed!\n");
+        exit(1);
     }
 
     if (connect(sck, (struct sockaddr *)&server, sizeof(server)) < 0) {
-      fprintf(stderr, "Connection failed\n");
-      exit(1);
+        fprintf(stderr, "Connection failed\n");
+        exit(1);
     }
 
-    // TODO: for one server
-    // parallel between servers
-    uint64_t begin = 1;
-    uint64_t end = k;
+    uint64_t server_begin = begin + i * range;
+    uint64_t server_end = server_begin + range - 1;
+    if (i == servers_num - 1) {
+        server_end += remainder;
+    }
 
     char task[sizeof(uint64_t) * 3];
-    memcpy(task, &begin, sizeof(uint64_t));
-    memcpy(task + sizeof(uint64_t), &end, sizeof(uint64_t));
+    memcpy(task, &server_begin, sizeof(uint64_t));
+    memcpy(task + sizeof(uint64_t), &server_end, sizeof(uint64_t));
     memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
 
     if (send(sck, task, sizeof(task), 0) < 0) {
-      fprintf(stderr, "Send failed\n");
-      exit(1);
+        fprintf(stderr, "Send failed\n");
+        exit(1);
     }
 
     char response[sizeof(uint64_t)];
     if (recv(sck, response, sizeof(response), 0) < 0) {
-      fprintf(stderr, "Recieve failed\n");
-      exit(1);
+        fprintf(stderr, "Recieve failed\n");
+        exit(1);
     }
 
-    // TODO: from one server
-    // unite results
     uint64_t answer = 0;
     memcpy(&answer, response, sizeof(uint64_t));
-    printf("answer: %llu\n", answer);
+    printf("Server %s:%d answer: %llu\n", to[i].ip, to[i].port, answer);
 
     close(sck);
-  }
+}
   free(to);
 
   return 0;
