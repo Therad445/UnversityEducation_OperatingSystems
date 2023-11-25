@@ -7,11 +7,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BUFSIZE 100
-#define SADDR struct sockaddr
-#define SIZE sizeof(struct sockaddr_in)
 
 int main(int argc, char *argv[]) {
+  int BUFSIZE = atoi(argv[1]);
+  int SIZE = sizeof(struct sockaddr_in);
   int fd;
   int nread;
   char buf[BUFSIZE];
