@@ -1,17 +1,22 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror
 
-all: client.o server.o
+all: server client
 
-client.o: client.c
-	$(CC) -o client.o client.c $(CFLAGS)
+server: server.o utils.o
+	gcc -o server server.o utils.o -Wall -Wextra -Werror -pthread
+
+client: client.o utils.o
+	gcc -o client client.o utils.o -Wall -Wextra -Werror
 
 server.o: server.c
-	$(CC) -o server.o server.c $(CFLAGS)
+	gcc -c server.c
+
+client.o: client.c
+	gcc -c client.c
+
+utils.o: utils.c
+	gcc -c utils.c
 
 clean:
-	rm client.o server.o
-
-dependencies:
-	client.o: client.c
-	server.o: server.c
+	rm -f *.o server client
